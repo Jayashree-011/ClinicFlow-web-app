@@ -1,0 +1,6 @@
+target/
+loge
+logs
+.claude/
+*./.claude/
+node_modules/

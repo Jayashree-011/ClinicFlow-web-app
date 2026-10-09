@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: ribbon-server
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            config-server:
+              - host: localhost
+                port: 8888
+            discovery-service:
+              - host: localhost
+                port: 8761
+            gateway:
+              - host: localhost
+                port: 8080
+  eureka:
+    instance:
+      instance-id: ${spring.application.name}:${random.value}
+    client:
+      service-url:
+        defaultZone: http://localhost:8710/eureka/
+
+server:
+  port: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'

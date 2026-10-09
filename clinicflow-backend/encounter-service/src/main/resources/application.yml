@@ -1,0 +1,60 @@
+server:
+  port: 0
+
+spring:
+  config:
+    import: optional:configserver:http://localhost:8701
+  application:
+    name: encounter-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:test}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+jwt:
+  secret: clinicflow-secret-key-for-jwt-token-generation-and-validation
+  expiration: 86400000
+
+eureka:
+  instance:
+    hostname: localhost
+    instance-id: ${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: http://localhost:8710/eureka/
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - java.io.IOException
+          - feign.FeignException
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
+
+management:
+  endpoints:
+    web:
+      base-path: /api/encounter/actuator
+      exposure:
+        include: 'health,info,circuitbreakers,circuitbreakerevents'
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true

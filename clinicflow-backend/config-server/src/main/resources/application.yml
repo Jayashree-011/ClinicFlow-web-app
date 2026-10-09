@@ -1,0 +1,15 @@
+server:
+  port: 8701
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native          # activates the filesystem (native) backend
+    group:
+      prod: native          # when SPRING_PROFILES_ACTIVE=prod, also activate native
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config-repo,file:./config-repo

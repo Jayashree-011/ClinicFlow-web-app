@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Blue rounded square — matches the Login logo badge -->
+  <rect width="32" height="32" rx="7" fill="#2563EB"/>
+  <!-- White activity / heartbeat line — matches lucide Activity icon used in Login -->
+  <polyline
+    points="2,16 7,16 9.5,9 13.5,23 17.5,7 21.5,21 24,16 30,16"
+    fill="none"
+    stroke="white"
+    stroke-width="2.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

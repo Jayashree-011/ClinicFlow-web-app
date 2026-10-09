@@ -1,0 +1,28 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: lab-service
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+jwt:
+  secret: clinicflow-secret-key-for-jwt-token-generation-and-validation
+  expiration: 86400000
+
+eureka:
+  instance:
+    hostname: localhost
+    instance-id: ${spring.application.name}:${random.value}
+  client:
+    service-url:
+      defaultZone: http://localhost:8710/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: 'health,info'

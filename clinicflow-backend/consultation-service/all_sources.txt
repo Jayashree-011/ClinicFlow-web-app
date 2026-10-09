@@ -1,0 +1,1020 @@
+﻿=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\PatientAppointmentApplication.java ===
+package com.clinicflow.consultation;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+
+@SpringBootApplication(scanBasePackages = "com.clinicflow.consultation")
+@EnableJpaRepositories(basePackages = "com.clinicflow.consultation.repository")
+@EnableDiscoveryClient
+public class PatientAppointmentApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(PatientAppointmentApplication.class, args);
+	}
+
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\config\DefaultAppointment.java ===
+package com.clinicflow.consultation.config;
+
+import com.clinicflow.consultation.entity.Appointment;
+import com.clinicflow.consultation.entity.Doctor;
+import com.clinicflow.consultation.entity.Patient;
+import com.clinicflow.consultation.exception.ObjectNotFoundException;
+import com.clinicflow.consultation.service.DoctorService;
+import com.clinicflow.consultation.service.PatientAppointmentService;
+import jakarta.annotation.PostConstruct;
+import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.DependsOn;
+import java.time.LocalDateTime;
+
+@Component
+@DependsOn("defaultPatient")
+public class DefaultAppointment {
+
+    private final PatientAppointmentService patientAppointmentService;
+    private final DoctorService doctorService;
+
+    public DefaultAppointment(PatientAppointmentService patientAppointmentService,
+                               DoctorService doctorService) {
+        this.patientAppointmentService = patientAppointmentService;
+        this.doctorService = doctorService;
+    }
+
+    private void createAppointment(Long patientId, Long doctorId, String department,
+                                    String serviceType, LocalDateTime startAt, LocalDateTime endAt) {
+        try {
+            Patient patient;
+            try {
+                patient = patientAppointmentService.getPatientById(patientId);
+            } catch (ObjectNotFoundException ex) {
+                // Fallback: try MRN-based lookup for default data seed (MRN-0001, MRN-0002...)
+                String mrn = String.format("MRN-%04d", patientId);
+                patient = patientAppointmentService.getPatientByMrn(mrn)
+                          .orElseThrow(() -> ex);
+            }
+            Doctor  doctor  = doctorService.getDoctorById(doctorId);
+
+            // FIX: was using == to compare Long objects â€” always false for boxed Long > 127
+            // because == compares references, not values. Changed to .equals()
+            boolean alreadyExists = patientAppointmentService
+                .getAppointmentsForPatient(patient)
+                .stream()
+                .anyMatch(a -> a.getDoctor() != null &&
+                               doctorId.equals(a.getDoctor().getDoctorId()));
+
+            if (alreadyExists) {
+                System.out.println("â­ï¸ Skipping â€” appointment already exists for patient ID: " + patientId);
+                return;
+            }
+
+            Appointment appointment = new Appointment();
+            appointment.setDoctor(doctor);
+            appointment.setDepartment(department);
+            appointment.setServiceType(serviceType);
+            appointment.setStartAt(startAt);
+            appointment.setEndAt(endAt);
+
+            patientAppointmentService.bookAppointment(patient, appointment);
+            System.out.println("âœ… Default appointment created for patient ID: " + patientId);
+
+        } catch (ObjectNotFoundException e) {
+            System.out.println("âš ï¸ Could not create appointment: " + e.getMessage());
+        }
+    }
+
+    @PostConstruct
+    public void createDefaultAppointments() {
+        createAppointment(1L, 1L, "Cardiology", "Consultation",
+            LocalDateTime.now().plusDays(1).withHour(9).withMinute(0).withSecond(0).withNano(0),
+            LocalDateTime.now().plusDays(1).withHour(9).withMinute(30).withSecond(0).withNano(0));
+
+        createAppointment(2L, 2L, "Neurology", "Follow-up",
+            LocalDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0),
+            LocalDateTime.now().plusDays(2).withHour(10).withMinute(30).withSecond(0).withNano(0));
+
+        createAppointment(3L, 3L, "General Practice", "Check-up",
+            LocalDateTime.now().plusDays(3).withHour(11).withMinute(0).withSecond(0).withNano(0),
+            LocalDateTime.now().plusDays(3).withHour(11).withMinute(30).withSecond(0).withNano(0));
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\config\DefaultDoctor.java ===
+package com.clinicflow.consultation.config;
+
+import com.clinicflow.consultation.entity.Doctor;
+import com.clinicflow.consultation.service.DoctorService;
+import jakarta.annotation.PostConstruct;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DefaultDoctor {
+
+    private final DoctorService doctorService;
+
+    public DefaultDoctor(DoctorService doctorService) {
+        this.doctorService = doctorService;
+    }
+
+    private void createDoctor(String name, String specialty, Long userId) {
+        boolean exists = doctorService.getAllDoctors()
+            .stream()
+            .anyMatch(d -> d.getName().equalsIgnoreCase(name));
+
+        if (exists) {
+            System.out.println("â­ï¸ Skipping â€” doctor already exists: " + name);
+            return;
+        }
+
+        Doctor doctor = new Doctor();
+        doctor.setName(name);
+        doctor.setSpecialty(specialty);
+        doctorService.registerDoctor(doctor, userId);
+        System.out.println("âœ… Default doctor created: " + name);
+    }
+
+    @PostConstruct
+    public void createDefaultDoctors() {
+        createDoctor("Dr. Alice Carter", "Cardiology", 1L);
+        createDoctor("Dr. Brian Nguyen", "Neurology", 1L);
+        createDoctor("Dr. Clara Mendes", "General Practice", 1L);
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\config\DefaultPatient.java ===
+package com.clinicflow.consultation.config;
+
+import org.springframework.stereotype.Component;
+import com.clinicflow.consultation.entity.Patient;
+import com.clinicflow.consultation.service.PatientAppointmentService;
+import jakarta.annotation.PostConstruct;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Component
+public class DefaultPatient {
+
+    private final PatientAppointmentService patientService;
+
+    public DefaultPatient(PatientAppointmentService patientService) {
+        this.patientService = patientService;
+    }
+
+    private void createPatient(String mrn, String name, LocalDate dob, String gender,
+                                String contactInfoJson, String addressJson,
+                                String primaryContact, Long userId) {
+        if (patientService.getPatientByMrn(mrn).isEmpty()) {
+            Patient patient = new Patient();
+            patient.setMrn(mrn);
+            patient.setName(name);
+            patient.setDob(dob);
+            patient.setGender(gender);
+            patient.setContactInfoJson(contactInfoJson);
+            patient.setAddressJson(addressJson);
+            patient.setPrimaryContact(primaryContact);
+            patient.setUserId(userId);
+            patient.setCreatedAt(LocalDateTime.now());
+            patient.setUpdatedAt(LocalDateTime.now());
+            patientService.registerPatient(patient);
+            System.out.println("âœ… Default patient created: " + name);
+        }
+    }
+
+    @PostConstruct
+    public void createDefaultPatients() {
+        createPatient("MRN-0001", "John Doe",
+            LocalDate.of(1990, 5, 15), "Male",
+            "{\"email\":\"john.doe@mail.com\", \"phone\":\"555-0101\"}",
+            "{\"street\":\"123 Main St\", \"city\":\"Springfield\", \"zip\":\"62701\"}",
+            "555-0101", 1L);
+
+        createPatient("MRN-0002", "Jane Smith",
+            LocalDate.of(1985, 8, 22), "Female",
+            "{\"email\":\"jane.smith@mail.com\", \"phone\":\"555-0102\"}",
+            "{\"street\":\"456 Elm St\", \"city\":\"Shelbyville\", \"zip\":\"62702\"}",
+            "555-0102", 1L);
+
+        createPatient("MRN-0003", "Jayashree Pandya",
+            LocalDate.of(1978, 3, 10), "Male",
+            "{\"email\":\"robert.johnson@mail.com\", \"phone\":\"555-0103\"}",
+            "{\"street\":\"789 Oak Ave\", \"city\":\"Capital City\", \"zip\":\"62703\"}",
+            "555-0103", 1L);
+
+        createPatient("MRN-0004", "Emily Davis",
+            LocalDate.of(1995, 12, 5), "Female",
+            "{\"email\":\"emily.davis@mail.com\", \"phone\":\"555-0104\"}",
+            "{\"street\":\"321 Pine St\", \"city\":\"Metropolis\", \"zip\":\"62704\"}",
+            "555-0104", 1L);
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\controller\AppointmentController.java ===
+package com.clinicflow.consultation.controller;
+
+import java.util.List;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.clinicflow.consultation.dto.AppointmentDTO;
+import com.clinicflow.consultation.entity.Appointment;
+import com.clinicflow.consultation.entity.Doctor;
+import com.clinicflow.consultation.entity.Patient;
+import com.clinicflow.consultation.exception.ObjectNotFoundException;
+import com.clinicflow.consultation.service.DoctorService;
+import com.clinicflow.consultation.service.PatientAppointmentService;
+
+@RestController
+@RequestMapping("/api/consultation/appointment")
+public class AppointmentController {
+
+    private final PatientAppointmentService pa_Service;
+    private final DoctorService doctorService;
+
+    public AppointmentController(PatientAppointmentService pa_Service, DoctorService doctorService) {
+        this.pa_Service = pa_Service;
+        this.doctorService = doctorService;
+    }
+
+    // GET: All appointments
+    @GetMapping("/appointments")
+    public List<AppointmentDTO> getAllAppointments() {
+        return pa_Service.getAllAppointments().stream().map(AppointmentDTO::new).toList();
+    }
+
+    // GET: Single appointment by ID
+    @GetMapping("/appointments/{appointmentId}")
+    public AppointmentDTO getAppointmentById(@PathVariable Long appointmentId) {
+        return new AppointmentDTO(pa_Service.getAppointmentById(appointmentId));
+    }
+
+    // GET: Appointments by patient
+    // FIX: getPatientById() throws ObjectNotFoundException already â€” null check was dead code
+    @GetMapping("/patient/{patientId}")
+    public List<AppointmentDTO> getAppointmentsByPatient(@PathVariable Long patientId) {
+        Patient patient = pa_Service.getPatientById(patientId);
+        return pa_Service.getAppointmentsForPatient(patient).stream().map(AppointmentDTO::new).toList();
+    }
+
+    // GET: Appointments by doctor
+    // FIX: moved ABOVE /{appointmentId} so Spring doesn't match "doctor" as a Long appointmentId
+    // Old order caused: GET /appointments/doctor/1 â†’ matched /{appointmentId} â†’ NumberFormatException
+    @GetMapping("/appointments/doctor/{doctorId}")
+    public List<AppointmentDTO> getAppointmentsByDoctor(@PathVariable Long doctorId) {
+        // FIX: getDoctorById() now throws ObjectNotFoundException â€” null check was dead code
+        Doctor doctor = doctorService.getDoctorById(doctorId);
+        return pa_Service.getAppointmentsByDoctor(doctor).stream().map(AppointmentDTO::new).toList();
+    }
+
+    // PUT: Update appointment
+    // FIX: returns AppointmentDTO instead of raw Appointment entity (avoids LAZY load crash)
+    @PutMapping("/appointments/{appointmentId}")
+    public AppointmentDTO updateAppointment(@PathVariable Long appointmentId,
+                                            @RequestBody AppointmentDTO appointmentDto) {
+        Doctor doctor = doctorService.getDoctorById(appointmentDto.getDoctorId());
+        Appointment appointmentEntity = appointmentDto.toAppointment(doctor);
+        return new AppointmentDTO(pa_Service.updateAppointment(appointmentId, appointmentEntity));
+    }
+
+    // DELETE: Appointment
+    @DeleteMapping("/appointments/{appointmentId}")
+    public String deleteAppointment(@PathVariable Long appointmentId) {
+        pa_Service.deleteAppointment(appointmentId);
+        return "Appointment deleted successfully with id: " + appointmentId;
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\controller\DoctorController.java ===
+package com.clinicflow.consultation.controller;
+
+import java.util.List;
+import java.util.stream.Collectors;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import com.clinicflow.consultation.dto.DoctorDTO;
+import com.clinicflow.consultation.entity.Doctor;
+import com.clinicflow.consultation.service.DoctorService;
+
+@RequestMapping("/api/consultation/doctor")
+@RestController
+public class DoctorController {
+    private final DoctorService doctorService;
+
+    public DoctorController(DoctorService doctorService) {
+        this.doctorService = doctorService;
+    }
+
+    @GetMapping("/list")
+    public List<DoctorDTO> getAllDoctors() {
+        return doctorService.getAllDoctors().stream()
+                .map(Doctor::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @GetMapping("/{doctorId}")
+    public DoctorDTO getDoctorById(@PathVariable Long doctorId) {
+        return doctorService.getDoctorById(doctorId).toDTO();
+    }
+
+    @PutMapping("/{doctorId}/update")
+    public DoctorDTO updateDoctor(@PathVariable Long doctorId, @RequestBody DoctorDTO doctor) {
+        return doctorService.updateDoctor(doctorId, doctor.toEntity()).toDTO();
+    }
+
+    @PostMapping("/{userId}/register")
+    public DoctorDTO registerDoctor(@PathVariable Long userId, @RequestBody DoctorDTO doctor) {
+        return doctorService.registerDoctor(doctor.toEntity(), userId).toDTO();
+    }
+
+    @DeleteMapping("/{doctorId}")
+    public void deleteDoctor(@PathVariable Long doctorId) {
+        doctorService.deleteDoctor(doctorId);
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\controller\PatientController.java ===
+package com.clinicflow.consultation.controller;
+
+import java.util.List;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.clinicflow.consultation.dto.AppointmentDTO;
+import com.clinicflow.consultation.dto.PatientDTO;
+import com.clinicflow.consultation.entity.Appointment;
+import com.clinicflow.consultation.entity.Doctor;
+import com.clinicflow.consultation.entity.Patient;
+import com.clinicflow.consultation.exception.ObjectNotFoundException;
+import com.clinicflow.consultation.service.DoctorService;
+import com.clinicflow.consultation.service.PatientAppointmentService;
+
+@RestController
+@RequestMapping("/api/consultation/patient")
+public class PatientController {
+
+    private final PatientAppointmentService service;
+    private final DoctorService doctorService;
+
+    public PatientController(PatientAppointmentService service, DoctorService doctorService) {
+        this.service = service;
+        this.doctorService = doctorService;
+    }
+
+    // POST: Register patient
+    @PostMapping("/register")
+    public PatientDTO registerPatient(@RequestBody PatientDTO patientDto) {
+        return new PatientDTO(service.registerPatient(patientDto.toPatient()));
+    }
+
+    // POST: Book appointment for patient
+    // FIX: removed Optional.of() dead code â€” getPatientById already throws if not found
+    // FIX: removed null check on doctor â€” getDoctorById already throws if not found
+    @PostMapping("/{patientId}/appointments")
+    public AppointmentDTO bookAppointment(@PathVariable Long patientId,
+                                          @RequestBody AppointmentDTO appointmentDto) {
+        Patient patient = service.getPatientById(patientId);
+        Doctor doctor   = doctorService.getDoctorById(appointmentDto.getDoctorId());
+        Appointment appointmentEntity = appointmentDto.toAppointment(doctor);
+        return new AppointmentDTO(service.bookAppointment(patient, appointmentEntity));
+    }
+
+    // GET: Single patient
+    @GetMapping("/{patientId}")
+    public PatientDTO getPatient(@PathVariable Long patientId) {
+        return new PatientDTO(service.getPatientById(patientId));
+    }
+
+    // GET: All patients
+    // FIX: renamed /patients â†’ /all to avoid conflict with /{patientId} path variable
+    @GetMapping("/all")
+    public List<PatientDTO> getAllPatients() {
+        return service.getAllPatients().stream().map(PatientDTO::new).toList();
+    }
+
+    // GET: Appointments for patient
+    // FIX: removed Optional.of() dead code
+    @GetMapping("/{patientId}/appointments")
+    public List<AppointmentDTO> getAppointments(@PathVariable Long patientId) {
+        Patient patient = service.getPatientById(patientId);
+        List<Appointment> list = service.getAppointmentsForPatient(patient);
+        if (list.isEmpty()) {
+            throw new ObjectNotFoundException("No appointments found for patient: " + patientId);
+        }
+        return list.stream().map(AppointmentDTO::new).toList();
+    }
+
+    // PUT: Update patient
+    @PutMapping("/{patientId}")
+    public PatientDTO updatePatient(@PathVariable Long patientId,
+                                    @RequestBody PatientDTO patientDto) {
+        return new PatientDTO(service.updatePatient(patientId, patientDto.toPatient()));
+    }
+
+    // DELETE: Patient
+    @DeleteMapping("/{patientId}")
+    public String deletePatient(@PathVariable Long patientId) {
+        service.deletePatient(patientId);
+        return "Patient deleted successfully with id: " + patientId;
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\dto\AppointmentDTO.java ===
+package com.clinicflow.consultation.dto;
+
+import com.clinicflow.consultation.entity.Appointment;
+import com.clinicflow.consultation.entity.Doctor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+public class AppointmentDTO {
+
+    private Long          appointmentId;
+    private Long          patientId;
+    private String        patientName;
+    private Long          doctorId;
+    private String        doctorName;
+    private String        department;
+    private String        serviceType;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
+    private String        status;
+
+    // FIX: patient.getId() â†’ patient.getPatientId() (correct field from Patient entity)
+    // FIX: null-safe for both LAZY-loaded doctor and patient
+    public AppointmentDTO(Appointment appointment) {
+        this.appointmentId = appointment.getAppointmentId();
+        this.department    = appointment.getDepartment();
+        this.serviceType   = appointment.getServiceType();
+        this.startAt       = appointment.getStartAt();
+        this.endAt         = appointment.getEndAt();
+        this.status        = appointment.getStatus();
+
+        if (appointment.getDoctor() != null) {
+            this.doctorId   = appointment.getDoctor().getDoctorId();
+            this.doctorName = appointment.getDoctor().getName();
+        }
+
+        if (appointment.getPatient() != null) {
+            this.patientId   = appointment.getPatient().getPatientId();
+            this.patientName = appointment.getPatient().getName();
+        }
+    }
+
+    public Appointment toAppointment(Doctor doctor) {
+        Appointment appointment = new Appointment();
+        appointment.setDepartment(department);
+        appointment.setServiceType(serviceType);
+        appointment.setStartAt(startAt);
+        appointment.setEndAt(endAt);
+        appointment.setStatus(status);
+        appointment.setDoctor(doctor);
+        return appointment;
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\dto\DoctorDTO.java ===
+package com.clinicflow.consultation.dto;
+import com.clinicflow.consultation.entity.Doctor;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class DoctorDTO {
+    private String name;
+    private String specialty;
+
+    public Doctor toEntity() {
+        Doctor doctor = new Doctor();
+        doctor.setName(this.name);
+        doctor.setSpecialty(this.specialty);
+        return doctor;
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\dto\PatientDTO.java ===
+package com.clinicflow.consultation.dto;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Date;
+import org.json.JSONException;
+import org.json.JSONObject;
+import com.clinicflow.consultation.entity.Patient;
+
+@Data
+@NoArgsConstructor
+public class PatientDTO {
+    private String id;
+    private String mrn;
+    private String name;
+    private Date dob;
+    private String gender;
+    private String email;
+    private String phoneNumber;
+    private String address;
+
+    public PatientDTO(Patient patient) {
+        this.id = String.valueOf(patient.getPatientId());
+        this.mrn = patient.getMrn();
+        this.name = patient.getName();
+        this.dob = Date.from(patient.getDob().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
+        this.gender = patient.getGender();
+        System.out.println("Contact Info JSON: " + patient.getContactInfoJson().toString());
+        try {
+            JSONObject json = new JSONObject(patient.getContactInfoJson());
+            this.email = json.getString("email");
+            this.phoneNumber = json.getString("phone");
+        } catch (JSONException e) {
+            // Handle the case where "email" key doesn't exist
+            this.email = null;
+            this.phoneNumber = null;
+        }
+        try{
+            JSONObject json = new JSONObject(patient.getAddressJson());
+            this.address = json.getString("street") != null ? json.getString("street") : "";
+            this.address += ", " + (json.getString("city") != null ? json.getString("city") : "");
+            this.address += " " + (json.getString("zip") != null ? json.getString("zip") : "");
+        } catch (JSONException e) {
+            // Handle the case where address JSON is malformed
+            this.address = null;
+        }
+        this.address = patient.getAddressJson();
+    }
+
+    public Patient toPatient() {
+        Patient patient = new Patient();
+        // patient.setMrn(mrn); MRN is generated in service layer
+        // patient.setId(id);
+        patient.setName(name);
+        patient.setDob(dob.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate());
+        patient.setGender(gender);
+        patient.setContactInfoJson("{\"email\":\"" + email + "\", \"phone\":\"" + phoneNumber + "\"}");
+        patient.setAddressJson(address); // Placeholder for address
+        patient.setPrimaryContact(email != null ? email : phoneNumber);
+        return patient;
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\entity\Appointment.java ===
+package com.clinicflow.consultation.entity;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+// FIX: replaced @Data with @Getter @Setter @NoArgsConstructor @AllArgsConstructor
+// @Data generates toString() which follows LAZY-loaded relations (Doctor, Patient),
+// triggering Hibernate to load them outside a session â†’ LazyInitializationException
+// or infinite recursion â†’ StackOverflowError.
+// Using explicit @Getter/@Setter avoids the dangerous auto-generated toString/equals/hashCode.
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "appointments")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Appointment {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "appointment_id")
+    private Long appointmentId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id", nullable = false)
+    private Patient patient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "doctor_id", nullable = false)
+    private Doctor doctor;
+
+    @Column(name = "department")
+    private String department;
+
+    @Column(name = "service_type")
+    private String serviceType;
+
+    @Column(name = "start_at")
+    private LocalDateTime startAt;
+
+    @Column(name = "end_at")
+    private LocalDateTime endAt;
+
+    @Column(name = "status")
+    private String status;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\entity\Doctor.java ===
+package com.clinicflow.consultation.entity;
+
+import java.util.List;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.CascadeType;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import com.clinicflow.consultation.dto.DoctorDTO;
+
+@Entity
+@Table(name = "doctors")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Doctor {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long doctorId;
+
+    @Column(name = "name")
+    private String name;
+
+    @Column(name = "specialty")
+    private String specialty;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @OneToMany(mappedBy = "doctor", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Appointment> appointments;
+
+    public DoctorDTO toDTO() {
+        return new DoctorDTO(name, specialty);
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\entity\Patient.java ===
+package com.clinicflow.consultation.entity;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "patients")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Patient {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "patient_id")
+    private Long patientId;
+
+    @Column(name = "mrn", nullable = false, unique = true)
+    private String mrn;
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "dob")
+    private LocalDate dob;
+
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "contact_info", columnDefinition = "json")
+    private String contactInfoJson;
+
+    @Column(name = "address", columnDefinition = "json")
+    private String addressJson;
+
+    @Column(name = "primary_contact")
+    private String primaryContact;
+
+    @Column(name = "status")
+    private String status;
+
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "patient", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Appointment> appointments;
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\exception\ObjectNotFoundException.java ===
+package com.clinicflow.consultation.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+
+@ResponseStatus(code = HttpStatus.NOT_FOUND, reason = "Object not found")
+public class ObjectNotFoundException extends RuntimeException {
+
+    public ObjectNotFoundException(String message) {
+        super(message);
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\repository\AppointmentRepository.java ===
+
+package com.clinicflow.consultation.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.clinicflow.consultation.entity.Appointment;
+import com.clinicflow.consultation.entity.Patient;
+import com.clinicflow.consultation.entity.Doctor;
+
+public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
+
+    List<Appointment> findByPatient(Patient patient);
+    List<Appointment> findByDoctor(Doctor doctor);
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\repository\DoctorRepository.java ===
+package com.clinicflow.consultation.repository;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import com.clinicflow.consultation.entity.Doctor;
+import java.util.List;
+@Repository
+public interface DoctorRepository extends JpaRepository<Doctor, Long> {
+    // Custom query methods can be defined here if needed
+    List<Doctor> findBySpecialty(String specialty);
+    List<Doctor> findByNameContainingIgnoreCase(String name);
+    List<Doctor> findBySpecialtyAndNameContainingIgnoreCase(String specialty, String name);
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\repository\PatientRepository.java ===
+package com.clinicflow.consultation.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.clinicflow.consultation.entity.Patient;
+
+public interface PatientRepository extends JpaRepository<Patient, Long> {
+    java.util.Optional<Patient> findByMrn(String mrn);
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\service\DoctorService.java ===
+package com.clinicflow.consultation.service;
+
+import com.clinicflow.consultation.entity.Doctor;
+import com.clinicflow.consultation.repository.DoctorRepository;
+import org.springframework.stereotype.Service;
+import com.clinicflow.consultation.exception.ObjectNotFoundException;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class DoctorService {
+    private final DoctorRepository doctorRepository;
+
+    public DoctorService(DoctorRepository doctorRepository) {
+        this.doctorRepository = doctorRepository;
+    }
+
+    public Doctor getDoctorById(Long doctorId) {
+        return doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new ObjectNotFoundException("Doctor not found with id: " + doctorId));
+    }
+
+    public Doctor registerDoctor(Doctor doctor, Long userId) {
+        Doctor existing = doctorRepository.findByNameContainingIgnoreCase(doctor.getName()).stream()
+                .filter(d -> d.getSpecialty().equalsIgnoreCase(doctor.getSpecialty()))
+                .findFirst()
+                .orElse(null);
+        if (existing != null) {
+            System.out.println("âš ï¸ Doctor already exists: " + doctor.getName());
+            return existing;
+        }
+        doctor.setUserId(userId);
+        return doctorRepository.save(doctor);
+    }
+
+    public Doctor updateDoctor(Long doctorId, Doctor updatedDoctor) {
+        Doctor existingDoctor = getDoctorById(doctorId);
+        existingDoctor.setName(updatedDoctor.getName());
+        existingDoctor.setSpecialty(updatedDoctor.getSpecialty());
+        return doctorRepository.save(existingDoctor);
+    }
+
+    public void deleteDoctor(Long doctorId) {
+        Doctor existingDoctor = getDoctorById(doctorId);
+        doctorRepository.delete(existingDoctor);
+    }
+
+    public List<Doctor> getAllDoctors() {
+        return doctorRepository.findAll();
+    }
+
+    public List<Doctor> getDoctorsBySpecialty(String specialty) {
+        return doctorRepository.findBySpecialty(specialty);
+    }
+
+    public List<Doctor> getDoctorsByName(String name) {
+        return doctorRepository.findByNameContainingIgnoreCase(name);
+    }
+
+    public List<Doctor> getDoctorsBySpecialtyAndName(String specialty, String name) {
+        return doctorRepository.findBySpecialtyAndNameContainingIgnoreCase(specialty, name);
+    }
+}
+=== C:\Users\2485074\INTDE26JFSR004_PoD3_ClinicFlow\clinicflow-backend\consultation-service\src\main\java\com\clinicflow\consultation\service\PatientAppointmentService.java ===
+package com.clinicflow.consultation.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+
+import com.clinicflow.consultation.entity.Appointment;
+import com.clinicflow.consultation.entity.Doctor;
+import com.clinicflow.consultation.entity.Patient;
+import com.clinicflow.consultation.exception.ObjectNotFoundException;
+import com.clinicflow.consultation.repository.AppointmentRepository;
+import com.clinicflow.consultation.repository.DoctorRepository;
+import com.clinicflow.consultation.repository.PatientRepository;
+
+@Service
+public class PatientAppointmentService {
+
+    private final PatientRepository patientRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final DoctorRepository doctorRepository;
+
+    public PatientAppointmentService(PatientRepository patientRepository,
+                                     AppointmentRepository appointmentRepository,
+                                     DoctorRepository doctorRepository) {
+        this.patientRepository = patientRepository;
+        this.appointmentRepository = appointmentRepository;
+        this.doctorRepository = doctorRepository;
+    }
+
+    // POST: Register patient
+    public Patient registerPatient(Patient patient) {
+        if (patient.getMrn() == null || patient.getMrn().isBlank()) {
+            patient.setMrn(UUID.randomUUID().toString());
+        }
+        if (patient.getStatus() == null || patient.getStatus().isBlank()) {
+            patient.setStatus("ACTIVE");
+        }
+        if (patient.getCreatedAt() == null) {
+            patient.setCreatedAt(LocalDateTime.now());
+        }
+        patient.setUpdatedAt(LocalDateTime.now());
+        return patientRepository.save(patient);
+    }
+
+    // POST: Book appointment
+    // FIX: removed false "throws ObjectNotFoundException" â€” never actually thrown here
+    public Appointment bookAppointment(Patient patient, Appointment appointment) {
+        appointment.setPatient(patient);
+        appointment.setStatus("SCHEDULED");
+        appointment.setCreatedAt(LocalDateTime.now());
+        appointment.setUpdatedAt(LocalDateTime.now());
+        return appointmentRepository.save(appointment);
+    }
+
+    // GET: Appointments for patient
+    public List<Appointment> getAppointmentsForPatient(Patient patient) {
+        return appointmentRepository.findByPatient(patient);
+    }
+
+    // GET: Appointment by ID
+    public Appointment getAppointmentById(Long appointmentId) {
+        return appointmentRepository.findById(appointmentId)
+                .orElseThrow(() ->
+                        new ObjectNotFoundException("Appointment not found: " + appointmentId));
+    }
+
+    // GET: All appointments
+    public List<Appointment> getAllAppointments() {
+        return appointmentRepository.findAll();
+    }
+
+    // GET: Patient by ID
+    public Patient getPatientById(Long patientId) {
+        return patientRepository.findById(patientId)
+                .orElseThrow(() ->
+                        new ObjectNotFoundException("Patient not found: " + patientId));
+    }
+
+    // GET: Patient by MRN
+    public Optional<Patient> getPatientByMrn(String mrn) {
+        return patientRepository.findByMrn(mrn);
+    }
+
+    // GET: All patients
+    public List<Patient> getAllPatients() {
+        return patientRepository.findAll();
+    }
+
+    // PUT: Update patient
+    public Patient updatePatient(Long patientId, Patient updatedPatient) {
+        Patient existing = patientRepository.findById(patientId)
+                .orElseThrow(() ->
+                        new ObjectNotFoundException("Patient not found: " + patientId));
+
+        existing.setName(updatedPatient.getName());
+        existing.setDob(updatedPatient.getDob());
+        existing.setGender(updatedPatient.getGender());
+        existing.setContactInfoJson(updatedPatient.getContactInfoJson());
+        existing.setAddressJson(updatedPatient.getAddressJson());
+        existing.setPrimaryContact(updatedPatient.getPrimaryContact());
+        existing.setStatus(updatedPatient.getStatus());
+
+        return patientRepository.save(existing);
+    }
+
+    // DELETE: Patient
+    public void deletePatient(Long patientId) {
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() ->
+                        new ObjectNotFoundException("Patient not found: " + patientId));
+        patientRepository.delete(patient);
+    }
+
+    // PUT: Update appointment
+    public Appointment updateAppointment(Long appointmentId, Appointment updated) {
+        Appointment existing = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() ->
+                        new ObjectNotFoundException("Appointment not found: " + appointmentId));
+
+        existing.setDepartment(updated.getDepartment());
+        existing.setServiceType(updated.getServiceType());
+        existing.setStartAt(updated.getStartAt());
+        existing.setEndAt(updated.getEndAt());
+        existing.setStatus(updated.getStatus());
+        existing.setUpdatedAt(LocalDateTime.now());
+
+        return appointmentRepository.save(existing);
+    }
+
+    // DELETE: Appointment
+    public void deleteAppointment(Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() ->
+                        new ObjectNotFoundException("Appointment not found: " + appointmentId));
+        appointmentRepository.delete(appointment);
+    }
+
+    // GET: Appointments by doctor
+    public List<Appointment> getAppointmentsByDoctor(Doctor doctor) {
+        return appointmentRepository.findByDoctor(doctor);
+    }
+}

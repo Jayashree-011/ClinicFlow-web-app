@@ -1,0 +1,65 @@
+server:
+  port: 8700
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+      default-filters:
+        - JwtAuthentication
+      routes:
+        - id: user-service-auth
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**
+
+        - id: consultation-service
+          uri: lb://consultation-service
+          predicates:
+            - Path=/api/consultation/**
+
+        - id: lab-service
+          uri: lb://lab-service
+          predicates:
+            - Path=/api/lab/**
+
+        - id: encounter-service
+          uri: lb://encounter-service
+          predicates:
+            - Path=/api/encounter/**
+
+        - id: pharmacy-service
+          uri: lb://pharmacy-service
+          predicates:
+            - Path=/api/pharmacy/**
+
+        - id: prescription-service
+          uri: lb://prescription-service
+          predicates:
+            - Path=/api/prescriptions/**
+
+        - id: billing-service
+          uri: lb://billing-service
+          predicates:
+            - Path=/api/billing/**
+
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
+
+        - id: task-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/tasks/**
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    service-url:
+      defaultZone: http://localhost:8710/eureka/
