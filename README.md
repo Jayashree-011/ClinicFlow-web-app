@@ -1,10 +1,10 @@
-# 🏥 ClinicFlow - Modern Clinic & Patient Management System
+# ClinicFlow - Modern Clinic & Patient Management System
 
 ClinicFlow is a streamlined, feature-rich clinic management web application designed for healthcare facilities, doctors, administrators, and patients. It streamlines appointment scheduling, patient queue management, electronic medical records (EMR), doctor availability tracking, billing, and telemetry analytics.
 
 ---
 
-## 🎨 Interface Preview
+## Interface Preview
 
 Below is a snapshot of the **ClinicFlow** dashboard interface featuring live homepage and login dashboard:
 
@@ -13,7 +13,7 @@ Below is a snapshot of the **ClinicFlow** dashboard interface featuring live hom
 
 ---
 
-## ✨ Key Features
+## ey Features
 
 - 📅 **Dynamic Appointment Scheduling**: Drag-and-drop & calendar view for patient bookings.
 - 🧑‍⚕️ **Doctor & Staff Management**: Track availability, specializations, and working hours.
@@ -23,7 +23,7 @@ Below is a snapshot of the **ClinicFlow** dashboard interface featuring live hom
 
 ---
 
-## 🏗️ Tech Stack
+## Tech Stack
 
 - **Frontend**: React 19, Vite, Tailwind CSS, Radix UI, Lucide Icons, Emotion & Material UI components
 - **Backend**: Node.js / Express, SQL database (Schema provided in `clinicflow-schema.sql`)
@@ -31,7 +31,7 @@ Below is a snapshot of the **ClinicFlow** dashboard interface featuring live hom
 
 ---
 
-## 🚀 Quick Start & Installation
+## Quick Start & Installation
 
 ### Prerequisites
 - Node.js (v18.x or higher)
@@ -54,7 +54,7 @@ The frontend application will launch locally at `http://localhost:5173`.
 ### 3. Backend Setup
 ---
 
-## 📜 Repository Structure
+## Repository Structure
 
 ```
 Clinicflow-web-app/
