@@ -8,7 +8,8 @@ ClinicFlow is a streamlined, feature-rich clinic management web application desi
 
 Below is a snapshot of the **ClinicFlow** dashboard interface featuring live patient queues, schedule calendars, appointment metrics, and doctor management stats:
 
-![ClinicFlow UI Screenshot](docs/clinicflow_ui.png)
+<img width="1882" height="846" alt="image" src="https://github.com/user-attachments/assets/073886d3-b719-40ba-b034-7bc283896bf1" />
+
 
 ---
 
