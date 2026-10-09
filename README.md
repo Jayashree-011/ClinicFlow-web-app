@@ -51,15 +51,6 @@ npm run dev
 The frontend application will launch locally at `http://localhost:5173`.
 
 ### 3. Backend Setup
-```bash
-cd ../clinicflow-backend
-npm install
-npm start
-```
-
-### 4. Database Setup
-Execute `clinicflow-schema.sql` against your target SQL database instance to populate the initial tables and schemas.
-
 ---
 
 ## 📜 Repository Structure
@@ -67,22 +58,13 @@ Execute `clinicflow-schema.sql` against your target SQL database instance to pop
 ```
 Clinicflow-web-app/
 ├── clinicflow-frontend/      # Vite + React frontend application
-├── clinicflow-backend/       # Node.js backend server API
+├── clinicflow-backend/       # Java backend server API
 ├── docs/                     # Documentation assets and screenshots
-│   └── clinicflow-ui.png     # Application UI preview
-├── clinicflow-schema.sql     # Database initialization script
+│   └── documentation for reference     # Application docs
 ├── run-all-services.ps1      # PowerShell startup script for all services
 └── README.md                 # Project documentation
 ```
 
 ---
 
-## 🤝 Contributing
 
-Contributions are always welcome! Feel free to open issues or submit pull requests to improve features, performance, or styling.
-
----
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
